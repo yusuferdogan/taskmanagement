@@ -24,7 +24,7 @@ var (
 
 func init() {
 	ctx = context.TODO()
-	mongoconn := options.Client().ApplyURI("mongodb://192.168.1.103:27017")
+	mongoconn := options.Client().ApplyURI("mongodb://localhost:27017")
 	mongoclient, err := mongo.Connect(ctx, mongoconn)
 
 	if err != nil {
@@ -46,9 +46,9 @@ func init() {
 }
 
 func main() {
-	
+
 	defer mongoclient.Disconnect(ctx)
-	
+
 	basepath := server.Group("/v1")
 	usercontroller.RegisterTaskRoute(basepath)
 

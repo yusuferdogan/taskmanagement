@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"example/taskmanagement/models"
+	"fmt"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -23,6 +26,20 @@ func NewTaskService(taskcollection *mongo.Collection, ctx context.Context) *Task
 }
 
 func (u *TaskServiceImpl) CreateTask(task *models.Task) error {
+
+	if task.Group < models.ToDo || task.Group > models.Done {
+		return errors.New("invalid group")
+	}
+	var mtask *models.Task
+	query := bson.D{bson.E{Key: "entry_code", Value: task.EntryCode}}
+	u.taskcollection.FindOne(u.ctx, query).Decode(&mtask)
+	if mtask != nil {
+		fmt.Println(mtask)
+		return errors.New("key code already exists")
+	}
+
+	task.ViewDate = time.Now()
+	task.ID = primitive.NewObjectID().Hex()
 	_, err := u.taskcollection.InsertOne(u.ctx, task)
 
 	return err
@@ -32,14 +49,17 @@ func (u TaskServiceImpl) GetTask(id *string) (*models.Task, error) {
 	var task *models.Task
 	query := bson.D{bson.E{Key: "id", Value: id}}
 	err := u.taskcollection.FindOne(u.ctx, query).Decode(&task)
-
+	if err == nil {
+		task.ViewDate = time.Now()
+		u.UpdateTask(task)
+	}
 	return task, err
 }
 
 func (u TaskServiceImpl) GetAll() ([]*models.Task, error) {
 	var tasks []*models.Task
 	sortOptions := options.Find()
-	sortOptions.SetSort(bson.D{{"view_date", -1}})
+	sortOptions.SetSort(bson.D{{Key: "view_date", Value: -1}})
 
 	cursor, err := u.taskcollection.Find(u.ctx, bson.D{}, sortOptions)
 
@@ -52,6 +72,7 @@ func (u TaskServiceImpl) GetAll() ([]*models.Task, error) {
 		err := cursor.Decode(&task)
 
 		if err != nil {
+			fmt.Println(err)
 			return nil, err
 		}
 		tasks = append(tasks, &task)
